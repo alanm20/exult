@@ -295,10 +295,20 @@ void Game_map::clear(
 void Game_map::read_map_data(
 ) {
 	Game_window *gwin = Game_window::get_instance();
+	//rotate world covers a  bigger map
+	if (gwin->rotate) 
+		gwin->enable_bwin();
+	
 	const int scrolltx = gwin->get_scrolltx();
 	const int scrollty = gwin->get_scrollty();
-	const int w = gwin->get_width();
-	const int h = gwin->get_height();
+	int w = gwin->get_width();
+	int h = gwin->get_height();
+
+	if (gwin->rotate) { 
+		w =gwin->get_bwin()->get_game_width();
+		h =gwin->get_bwin()->get_game_height();
+		gwin->disable_bwin();
+	}	
 	// Start one tile to left.
 	const int firstsx = (scrolltx - 1) / c_tiles_per_schunk;
 	const int firstsy = (scrollty - 1) / c_tiles_per_schunk;

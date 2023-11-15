@@ -472,32 +472,56 @@ void ActionEndgame(int const *params) {
 void ActionScrollLeft(int const *params) {
 	ignore_unused_variable_warning(params);
 	Game_window *gwin = Game_window::get_instance();
-	for (int i = 16; i; i--)
-		gwin->view_left();
+    if (gwin->rotate)
+        for (int i = 10; i; i--) {
+			gwin->view_left();
+			gwin->view_down();
+        }
+    else	
+		for (int i = 16; i; i--)
+			gwin->view_left();
 }
 
 //  { ActionScrollRight, 0, "Scroll right", cheat_keys, NONE },
 void ActionScrollRight(int const *params) {
 	ignore_unused_variable_warning(params);
 	Game_window *gwin = Game_window::get_instance();
-	for (int i = 16; i; i--)
-		gwin->view_right();
+    if (gwin->rotate)
+        for (int i = 10; i; i--) {
+			gwin->view_right();
+            gwin->view_up();
+        }
+    else	
+		for (int i = 16; i; i--)
+			gwin->view_right();
 }
 
 //  { ActionScrollUp, 0, "Scroll up", cheat_keys, NONE },
 void ActionScrollUp(int const *params) {
 	ignore_unused_variable_warning(params);
 	Game_window *gwin = Game_window::get_instance();
-	for (int i = 16; i; i--)
-		gwin->view_up();
+    if (gwin->rotate)
+       for (int i = 10; i; i--) {
+           gwin->view_up();
+           gwin->view_left();
+       }
+    else	
+		for (int i = 16; i; i--)
+			gwin->view_up();
 }
 
 //  { ActionScrollDown, 0, "Scroll down", cheat_keys, NONE },
 void ActionScrollDown(int const *params) {
 	ignore_unused_variable_warning(params);
 	Game_window *gwin = Game_window::get_instance();
-	for (int i = 16; i; i--)
-		gwin->view_down();
+    if (gwin->rotate)
+        for (int i = 10; i; i--) {
+			gwin->view_down();
+			gwin->view_right();
+        }
+    else
+		for (int i = 16; i; i--)
+			gwin->view_down();
 }
 
 int get_walking_speed(int const *params) {
@@ -517,56 +541,80 @@ int get_walking_speed(int const *params) {
 void ActionWalkWest(int const *params) {
 	Game_window *gwin = Game_window::get_instance();
 	const int speed = get_walking_speed(params);
-	gwin->start_actor(gwin->get_width() / 2 - 50, gwin->get_height() / 2, speed);
+	if (gwin->rotate) // west is Southwest on screen
+		gwin->start_actor(gwin->get_width() / 2 - 50, gwin->get_height() / 2 + 50, speed);
+	else
+		gwin->start_actor(gwin->get_width() / 2 - 50, gwin->get_height() / 2, speed);
 }
 
 //  { ActionWalkEast, 0, "Walk east", normal_keys, NONE },
 void ActionWalkEast(int const *params) {
 	Game_window *gwin = Game_window::get_instance();
 	const int speed = get_walking_speed(params);
-	gwin->start_actor(gwin->get_width() / 2 + 50, gwin->get_height() / 2, speed);
+	if (gwin->rotate) // East is Northeast on screen
+		gwin->start_actor(gwin->get_width() / 2 + 50, gwin->get_height() / 2 - 50, speed);
+	else
+		gwin->start_actor(gwin->get_width() / 2 + 50, gwin->get_height() / 2, speed);
 }
 
 //  { ActionWalkNorth, 0, "Walk north", normal_keys, NONE },
 void ActionWalkNorth(int const *params) {
 	Game_window *gwin = Game_window::get_instance();
 	const int speed = get_walking_speed(params);
-	gwin->start_actor(gwin->get_width() / 2, gwin->get_height() / 2 - 50, speed);
+	if (gwin->rotate) // Noth is Northwest on screen
+		gwin->start_actor(gwin->get_width() / 2 - 50, gwin->get_height() / 2 - 50, speed);
+	else
+		gwin->start_actor(gwin->get_width() / 2, gwin->get_height() / 2 - 50, speed);
 }
 
 //  { ActionWalkSouth, 0, "Walk south", normal_keys, NONE },
 void ActionWalkSouth(int const *params) {
 	Game_window *gwin = Game_window::get_instance();
 	const int speed = get_walking_speed(params);
-	gwin->start_actor(gwin->get_width() / 2, gwin->get_height() / 2 + 50, speed);
+	if (gwin->rotate) // South is Southeast on screen
+		gwin->start_actor(gwin->get_width() / 2 + 50, gwin->get_height() / 2 + 50, speed);
+	else
+		gwin->start_actor(gwin->get_width() / 2, gwin->get_height() / 2 + 50, speed);
 }
 
 //  { ActionWalkNorthEast, 0, "Walk north-east", normal_keys, NONE },
 void ActionWalkNorthEast(int const *params) {
 	Game_window *gwin = Game_window::get_instance();
 	const int speed = get_walking_speed(params);
-	gwin->start_actor(gwin->get_width() / 2 + 50, gwin->get_height() / 2 - 50, speed);
+	if (gwin->rotate) // Northeast key is North 
+		gwin->start_actor(gwin->get_width() / 2, gwin->get_height() / 2 - 50, speed);
+	else
+		gwin->start_actor(gwin->get_width() / 2 + 50, gwin->get_height() / 2 - 50, speed);
 }
 
 //  { ActionWalkSouthEast, 0, "Walk south-east", normal_keys, NONE },
 void ActionWalkSouthEast(int const *params) {
 	Game_window *gwin = Game_window::get_instance();
 	const int speed = get_walking_speed(params);
-	gwin->start_actor(gwin->get_width() / 2 + 50, gwin->get_height() / 2 + 50, speed);
+	if (gwin->rotate) // Southeast is East on screeen
+		gwin->start_actor(gwin->get_width() / 2 + 50, gwin->get_height() / 2, speed);
+	else
+		gwin->start_actor(gwin->get_width() / 2 + 50, gwin->get_height() / 2 + 50, speed);
 }
 
 //  { ActionWalkNorthWest, 0, "Walk north-west", normal_keys, NONE },
 void ActionWalkNorthWest(int const *params) {
 	Game_window *gwin = Game_window::get_instance();
 	const int speed = get_walking_speed(params);
-	gwin->start_actor(gwin->get_width() / 2 - 50, gwin->get_height() / 2 - 50, speed);
+	if (gwin->rotate) // Northwest key is West on screen
+		gwin->start_actor(gwin->get_width() / 2 - 50, gwin->get_height() / 2, speed);
+	else
+		gwin->start_actor(gwin->get_width() / 2 - 50, gwin->get_height() / 2 - 50, speed);
 }
 
 //  { ActionWalkSouthWest, 0, "Walk south-west", normal_keys, NONE },
 void ActionWalkSouthWest(int const *params) {
 	Game_window *gwin = Game_window::get_instance();
 	const int speed = get_walking_speed(params);
-	gwin->start_actor(gwin->get_width() / 2 - 50, gwin->get_height() / 2 + 50, speed);
+	if (gwin->rotate) // Southwest key is South on screen
+		gwin->start_actor(gwin->get_width() / 2, gwin->get_height() / 2 + 50, speed);
+	else
+		gwin->start_actor(gwin->get_width() / 2 - 50, gwin->get_height() / 2 + 50, speed);
 }
 
 //  { ActionStopWalking, 0, "Stop Walking", cheat_keys, NONE },
@@ -874,3 +922,29 @@ void ActionTest(int const *params) {
 	ignore_unused_variable_warning(params);
 }
 
+// ActionRotate, 0, "Toggle rotate world", Action::cheat_keys, NONE,
+void ActionRotate(int const *params)
+{
+	Game_window *gwin = Game_window::get_instance();
+	if (gwin->rotate == false)
+	{
+		Image_window* win=gwin->get_win();
+		if (gwin->get_win()->get_display_width() <640 || gwin->get_win()->get_display_height()<400 )
+		{
+			gwin->get_effects()->center_text("Rotate: Resolution must be higher than 640x400");
+		}		
+		else
+		{
+
+			if (gwin->get_win()->scaler_supports_alpha(win->get_scaler()))
+				gwin->rotate=true;
+			else
+				// not supported scaler
+				gwin->get_effects()->center_text("Only: Point, 2xSaI, Sup2xSaI, SupEagle, Scale2X");
+		}
+	}
+	else
+		gwin->rotate=false;
+	gwin->set_all_dirty();
+	gwin->paint();
+}

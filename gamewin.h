@@ -96,7 +96,9 @@ class Game_window {
 	Game_render *render;        // Helps with rendering.
 	Gump_manager *gump_man;     // Open containers on screen.
 	Party_manager *party_man;   // Keeps party list.
+	Coord *rotate_scale;	// rotation coordiate look up table, contains x y offset
 	Image_window8 *win;     // Window to display into.
+	Image_window8 *bwin;		// Window to hold the expanded background map for rotate view
 	Npc_proximity_handler *npc_prox;// Handles nearby NPC's.
 	Palette *pal;
 	Shape_manager *shape_man;   // Manages shape file.
@@ -157,6 +159,7 @@ class Game_window {
 	void clear_world(bool restoremapedit);      // Clear out world's contents.
 	void read_save_names();     // Read in saved-game names.
 	long check_time_stopped();
+	bool drag_map_obj;   // flag indicate obj being drag on a rotate map
 
 	// Red plasma animation during game load
 	uint32 load_palette_timer;
@@ -167,6 +170,9 @@ public:
 	/*
 	 *  Public flags and gameplay options:
 	 */
+	bool rotate; 			// flag for enable rotate world
+	bool rotate_keep_walk_keys; // don't change walk keys to match rotated screen 
+	bool bwin_active;       // if ture get_win() returns .bwin, .win otherwise	
 	int skip_lift;          // Skip objects with lift >= this.  0
 	//   means 'terrain-editing' mode.
 	bool paint_eggs;
@@ -218,8 +224,31 @@ public:
 		return TileRect(0, 0, win->get_game_width(), win->get_game_height());
 	}
 	inline TileRect get_full_rect() const { // Get window's rectangle.
-		return TileRect(win->get_start_x(), win->get_start_y(), win->get_full_width(), win->get_full_height());
-	}
+		if (rotate) { // upper left corner xy can be negative as background window is bigger than foregound window
+				// paint() is modified to render within background window
+				int startx,starty,width,height;
+				int win_w=win->get_full_width() , bwin_w=bwin->get_full_width();
+				int win_h=win->get_full_height() , bwin_h=bwin->get_full_height();
+				startx=win->get_start_x();
+				starty=win->get_start_y();
+				if (bwin_w > win_w) {
+					startx+=(win_w-bwin_w)/2;
+					width=bwin_w;
+				}
+				else
+					width=win_w;
+				if (bwin_h > win_h) {
+					starty+=(win_h-bwin_h)/2;
+					height=bwin_h;
+				}
+				else
+					height=win_h;
+				return TileRect(startx, starty, width, height); 			 
+		}
+		else
+			return TileRect(win->get_start_x(), win->get_start_y(), win->get_full_width(), win->get_full_height());
+	}		
+
 	TileRect get_win_tile_rect() const { // Get it in tiles, rounding up.
 		return TileRect(get_scrolltx(), get_scrollty(),
 		                (win->get_game_width() + c_tilesize - 1) / c_tilesize,
@@ -357,7 +386,10 @@ public:
 		return usecode;
 	}
 	inline Image_window8 *get_win() const {
-		return win;
+		if (bwin_active) // a hack for overiding bliting target
+			return bwin;
+		else	
+			return win;
 	}
 	inline Time_queue *get_tqueue() const {
 		return tqueue;
@@ -521,6 +553,10 @@ public:
 	// Paint scene at given tile.
 	void paint_map_at_tile(int x, int y, int w, int h,
 	                       int toptx, int topty, int skip_above = 31);
+	void rotate45(int &x , int &y);
+	Coord rotate_45(int x, int y) const;
+	TileRect rotate45(TileRect& r);
+    void map_to_rotated_map(int &x, int &y);						   
 	// Paint area of image.
 	void paint(int x, int y, int w, int h);
 	void paint(TileRect &r) {
@@ -569,6 +605,7 @@ public:
 	}
 	// Get screen area used by object.
 	TileRect get_shape_rect(const Game_object *obj) const;
+	TileRect get_rotate_shape_rect(Game_object *obj);	
 	// Get screen loc. of object.
 	void get_shape_location(const Game_object *obj, int &x, int &y);
 	void get_shape_location(Tile_coord const &t, int &x, int &y);
@@ -711,7 +748,14 @@ private:
 	// Is lerping enabled
 	int lerping_enabled;
 
+	// backup copy of scrolltx , scrollty
+	int b_scrolltx, b_scrollty;
 public:
+
+	// enable/disable tiles/shape bliting to bwin
+	void enable_bwin();
+	void disable_bwin();
+
 	// Reset (well update really) saved lerp scroll positions
 	void lerp_reset();
 
@@ -731,6 +775,12 @@ public:
 	void set_lerping_enabled(int e) {
 		lerping_enabled = e;
 	}
+
+	Image_window8* get_bwin() { 
+		return bwin;
+	}
+
+	void setup_rotate_lut(int gwidth, int gheight,int scale);	
 };
 
 #endif

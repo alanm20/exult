@@ -57,6 +57,7 @@ class Palette {
 	void loadxform(const unsigned char *buf, const char *xfname, int &xindex);
 
 	static unsigned char border[3];
+	int border_index;
 public:
 	Palette();
 	Palette(Palette *pal);      // "Copy" constructor.
@@ -126,7 +127,7 @@ public:
 
 	unsigned char get_border_index() const {
 
-		return border255 ? 255 : 0;
+		return border_index; /* original code:  border255 ? 255 : 0; */
 	}
 };
 

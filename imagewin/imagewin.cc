@@ -55,6 +55,7 @@ Boston, MA  02111-1307, USA.
 #include "manip.h"
 #include "BilinearScaler.h"
 #include "PointScaler.h"
+#include "gamewin.h"
 
 #include "Configuration.h"
 
@@ -475,15 +476,22 @@ void Image_window::create_surface(
 ) {
 	uses_palette = true;
 	draw_surface = paletted_surface = inter_surface = display_surface = nullptr;
-
-	if (!Scalers[fill_scaler].arb) {
-		if (Scalers[scaler].arb)
-			fill_scaler = scaler;
-		else
-			fill_scaler = point;
-	}
-
-	get_draw_dims(w, h, scale, fill_mode, game_width, game_height, inter_width, inter_height);
+	if (backbuf) 
+		fill_scaler=NumScalers; // use this to disable fill_scaler for background windows (bwin)
+	else
+		if (!Scalers[fill_scaler].arb) {
+			if (Scalers[scaler].arb)
+				fill_scaler = scaler;
+			else
+				fill_scaler = point;
+		}
+	if (backbuf) {
+			// no aspect_factor for rotate background buffer
+			inter_width = game_width * scale;
+			inter_height = game_height * scale;
+		}
+	else
+		get_draw_dims(w, h, scale, fill_mode, game_width, game_height, inter_width, inter_height);
 
 	if (!try_scaler(w, h)) {
 		// Try fallback to point scaler if it failed, if it doesn't work, we probably can't run
@@ -588,73 +596,97 @@ bool Image_window::create_scale_surfaces(int w, int h, int bpp) {
 	hwdepth = Get_best_bpp(w, h, hwdepth, flags);
 	if (!hwdepth) return false;
 
-	if (screen_window != nullptr) {
-		SDL_SetWindowSize(screen_window, w, h);
-		SDL_SetWindowFullscreen(screen_window, flags);
-		SDL_DestroyTexture(screen_texture);
-		SDL_DestroyRenderer(screen_renderer);
-	} else
-		screen_window = SDL_CreateWindow("", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, w, h, flags);
-	if (screen_window == nullptr)
-		cout << "Couldn't create window: " << SDL_GetError() << std::endl;
-	screen_renderer = SDL_CreateRenderer(screen_window, -1, 0);
-	if (screen_renderer == nullptr)
-		cout << "Couldn't create renderer: " << SDL_GetError() << std::endl;
+	// backgroud buffer does not show display window, still will have a inter_surface for upscaling
+	if (backbuf) {
+		draw_surface =  SDL_CreateRGBSurface(SDL_SWSURFACE, game_width + 2*guard_band, game_height + 2*guard_band, ibuf->depth, 0, 0, 0, 0);
+		int sbpp;
+			Uint32 sRmask;
+			Uint32 sGmask;
+			Uint32 sBmask;
+			Uint32 sAmask;
+		SDL_PixelFormatEnumToMasks(desktop_displaymode.format, &sbpp, &sRmask, &sGmask, &sBmask, &sAmask);
 
-	if (fullscreen) {
-		int dw;
-		int dh;
-		//with HighDPi this returns the higher resolutions
-		SDL_GetRendererOutputSize(screen_renderer, &dw, &dh);
-		w=dw;
-		h=dh;
-		const Resolution res = { w, h };
-		p_resolutions[(w << 16) | h] = res;
-		//getting new native scale when highdpi is active
-		int sw;
-		SDL_GetWindowSize(screen_window, &sw, nullptr);
-		nativescale = float(dw) / sw;
-		//high resolution fullscreen needs this to make the whole screen available
-		SDL_RenderSetLogicalSize(screen_renderer, w, h);
-	} else
-		//make sure the window has the right dimensions
-		SDL_SetWindowSize(screen_window, w, h);
+		display_surface = SDL_CreateRGBSurface(0,
+				w, h, sbpp,
+							sRmask, sGmask, sBmask, sAmask);
+		if (display_surface == nullptr)
+			cout << "Couldn't create display surface: " << SDL_GetError() << std::endl;
+		if (!draw_surface || !display_surface) {
+			cerr << "Couldn't create draw surface" << endl;
+			free_surface();
+			return false;
+		}
 
-	// Do an initial draw/fill
-	SDL_SetRenderDrawColor(screen_renderer, 0, 0, 0, 255);
-	SDL_RenderClear(screen_renderer);
-	SDL_RenderPresent(screen_renderer);
-
-	int sbpp;
-       	Uint32 sRmask;
-       	Uint32 sGmask;
-       	Uint32 sBmask;
-       	Uint32 sAmask;
-	SDL_PixelFormatEnumToMasks(desktop_displaymode.format, &sbpp, &sRmask, &sGmask, &sBmask, &sAmask);
-
-	display_surface = SDL_CreateRGBSurface(0,
-			w, h, sbpp,
-                        sRmask, sGmask, sBmask, sAmask);
-	if (display_surface == nullptr)
-		cout << "Couldn't create display surface: " << SDL_GetError() << std::endl;
-	screen_texture = SDL_CreateTexture(screen_renderer,
-                        desktop_displaymode.format,
-                        SDL_TEXTUREACCESS_STREAMING,
-                        w, h);
-	if (screen_texture == nullptr)
-		cout << "Couldn't create texture: " << SDL_GetError() << std::endl;
-	if (!display_surface) {
-		cerr << "Unable to set video mode to" << w << "x" << h << " " << hwdepth << " bpp" << endl;
-		free_surface();
-		return false;
 	}
+	else
+	{
+		if (screen_window != nullptr) {
+			SDL_SetWindowSize(screen_window, w, h);
+			SDL_SetWindowFullscreen(screen_window, flags);
+			SDL_DestroyTexture(screen_texture);
+			SDL_DestroyRenderer(screen_renderer);
+		} else
+			screen_window = SDL_CreateWindow("", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, w, h, flags);
+		if (screen_window == nullptr)
+			cout << "Couldn't create window: " << SDL_GetError() << std::endl;
+		screen_renderer = SDL_CreateRenderer(screen_window, -1, 0);
+		if (screen_renderer == nullptr)
+			cout << "Couldn't create renderer: " << SDL_GetError() << std::endl;
 
-	if (!(draw_surface =  SDL_CreateRGBSurface(SDL_SWSURFACE, inter_width / scale + 2 * guard_band, inter_height / scale + 2 * guard_band, ibuf->depth, 0, 0, 0, 0))) {
-		cerr << "Couldn't create draw surface" << endl;
-		free_surface();
-		return false;
+		if (fullscreen) {
+			int dw;
+			int dh;
+			//with HighDPi this returns the higher resolutions
+			SDL_GetRendererOutputSize(screen_renderer, &dw, &dh);
+			w=dw;
+			h=dh;
+			const Resolution res = { w, h };
+			p_resolutions[(w << 16) | h] = res;
+			//getting new native scale when highdpi is active
+			int sw;
+			SDL_GetWindowSize(screen_window, &sw, nullptr);
+			nativescale = float(dw) / sw;
+			//high resolution fullscreen needs this to make the whole screen available
+			SDL_RenderSetLogicalSize(screen_renderer, w, h);
+		} else
+			//make sure the window has the right dimensions
+			SDL_SetWindowSize(screen_window, w, h);
+
+		// Do an initial draw/fill
+		SDL_SetRenderDrawColor(screen_renderer, 0, 0, 0, 255);
+		SDL_RenderClear(screen_renderer);
+		SDL_RenderPresent(screen_renderer);
+
+		int sbpp;
+			Uint32 sRmask;
+			Uint32 sGmask;
+			Uint32 sBmask;
+			Uint32 sAmask;
+		SDL_PixelFormatEnumToMasks(desktop_displaymode.format, &sbpp, &sRmask, &sGmask, &sBmask, &sAmask);
+
+		display_surface = SDL_CreateRGBSurface(0,
+				w, h, sbpp,
+							sRmask, sGmask, sBmask, sAmask);
+		if (display_surface == nullptr)
+			cout << "Couldn't create display surface: " << SDL_GetError() << std::endl;
+		screen_texture = SDL_CreateTexture(screen_renderer,
+							desktop_displaymode.format,
+							SDL_TEXTUREACCESS_STREAMING,
+							w, h);
+		if (screen_texture == nullptr)
+			cout << "Couldn't create texture: " << SDL_GetError() << std::endl;
+		if (!display_surface) {
+			cerr << "Unable to set video mode to" << w << "x" << h << " " << hwdepth << " bpp" << endl;
+			free_surface();
+			return false;
+		}
+
+		if (!(draw_surface =  SDL_CreateRGBSurface(SDL_SWSURFACE, inter_width / scale + 2 * guard_band, inter_height / scale + 2 * guard_band, ibuf->depth, 0, 0, 0, 0))) {
+			cerr << "Couldn't create draw surface" << endl;
+			free_surface();
+			return false;
+		}
 	}
-
 	// Scale using 'fill_scaler' only
 	if (scaler == fill_scaler || scale == 1) {
 		inter_surface = draw_surface;
@@ -670,7 +702,7 @@ bool Image_window::create_scale_surfaces(int w, int h, int bpp) {
 		inter_surface = display_surface;
 	}
 
-	if ((uses_palette = (bpp == 8))) paletted_surface = display_surface;
+	if (!backbuf && (uses_palette = (bpp == 8))) paletted_surface = display_surface;
 	else paletted_surface = draw_surface;
 
 	return true;
@@ -774,6 +806,7 @@ void Image_window::resized(
 	create_surface(neww, newh); // Create new one.
 }
 
+extern Coord* g_rotate_scale;
 /*
 *   Repaint portion of window.
 */
@@ -810,6 +843,27 @@ void Image_window::show(
 
 	w &= ~3;
 	h &= ~3;
+
+	Game_window *gwin = Game_window::get_instance();
+	// if rotate is on and this is the main game window , first copy/rotate background from bwin
+	if (gwin->rotate && gwin->get_main_actor() && bwin ) {		
+		if (bwin->need_palette_update) // palette entry changed, must involve scaler  to reflect the new color
+		{
+			bwin->show();		
+			bwin->set_palette_update(false);
+		}
+		// cacluate whether game area need to be update
+		int sx=ibuf->offset_x;
+		int sy=ibuf->offset_y;
+		
+		int gx=x-sx, gy=y-sy, gw=w, gh=h;
+		if (gx < 0) { gw+=gx; gx=0;}
+		if (gy < 0) { gh+=gy; gy=0;}
+		if (gx+gw >game_width) { gw=game_width-gx;}
+		if (gy+gh >game_height) { gh=game_height-gy;}
+		if (gw>0 && gh >0) // game area need update, fill area with content from bwin, apply rotation
+			copy_inter(bwin,gx,gy,gw,gh, g_rotate_scale);
+	}
 
 	// Phase 1 blit from draw_surface to inter_surface
 	if (draw_surface != inter_surface) {
@@ -853,6 +907,8 @@ void Image_window::show(
 		w *= scale;
 		h *= scale;
 	}
+	if (backbuf)
+		return; // no bliting to screen for background buffer (bwin)
 
 	// Phase 2 blit from inter_surface to display_surface
 	if (inter_surface != display_surface) {
@@ -882,6 +938,131 @@ void Image_window::show(
 	// Phase 3 blit high res draw surface on top of display_surface
 	// Phase 4 notify SDL
 	UpdateRect(display_surface, x, y, w, h);
+}
+
+bool Image_window::scaler_supports_alpha(int scaler_num)
+{
+	Game_window *gwin = Game_window::get_instance();
+			const char* scaler = get_name_for_scaler(scaler_num);
+				/*Bilinear
+				BilinearPlus
+				SuperEagle
+				Super2xSaI
+				Scale2x*/
+			if ( 
+				!strcmp(scaler,"Point") 
+				|| !strcmp(scaler,"2xSaI") 
+				|| !strcmp(scaler,"SuperEagle") 
+				|| !strcmp(scaler,"Super2xSaI") 
+				|| !strcmp(scaler,"Scale2X"))
+				return true;
+			else
+				return false;
+}
+
+// x,y is the offset from upper left corner of game area, not including the borders
+// rotate_scale is the rotation xy-offset look up table
+void Image_window::copy_inter(Image_window* src, int x,
+		int y, int w, int h, Coord* rotate_scale)
+{
+	if (inter_surface)
+	{
+		int bpp= inter_surface->format->BytesPerPixel;
+		SDL_Surface* src_inter=src->inter_surface; //get_inter();
+		unsigned char* dst=(unsigned char*)inter_surface->pixels+ (y+ibuf->offset_y)*scale *inter_surface->pitch + (x+ ibuf->offset_x)*scale*bpp;
+
+		if (inter_surface!=display_surface)
+		{  		// inter_surface->pixels points to guard band if fill scaler is used, skip guard band 
+			dst+=(scale*guard_band*inter_surface->pitch + scale*guard_band*bpp);
+		}
+
+		// x,y, w, h all need to multiply with scale for inter_surface
+		int dsth=h*scale;
+		int dstw=w*scale; 
+		int midx = src_inter->w/2;
+		int midy = src_inter->h/2;
+		int index=0,i;
+		int nx, ny;
+		unsigned char* from, *to;
+		index = game_width*scale * y*scale + x*scale;
+		while (dsth--)
+		{
+			to=dst;
+			for (i = 0 ; i < dstw; i++)
+			{
+				ny=rotate_scale[index].y+midy;
+				nx=rotate_scale[index].x+midx;
+				from=(unsigned char*)src_inter->pixels + ny*src_inter->pitch+nx*bpp;
+				memcpy(to,from,bpp);
+				to+=bpp;
+				index++;
+			}
+			index +=(game_width*scale-dstw);
+			dst+=inter_surface->pitch;
+
+		}
+	}
+}
+#define SINn45 -0.7071067f
+#define COSn45 0.7071067f
+#define SIN45 0.7071067f
+#define COS45 0.7071067f
+#define SQRT2 1.4142135f
+
+void Image_window::calc_rotation_adjustment() {
+	int gw = get_game_width();
+	int gh = get_game_height();
+	int gxc = gw/2;
+	int gyc = gh/2;
+	int dw = get_display_width();
+	int dh = get_display_height();
+	int mid_x = inter_width /2 ;
+	int mid_y = inter_height /2 ;
+	int dxc = dw /2;
+	int dyc = dh /2;
+	int inter_x = dxc * inter_width/dw;
+	int inter_y = dyc * inter_height/dh;
+	int index = gw * scale * inter_y + inter_x;
+	int rxc = (g_rotate_scale[index].x+mid_x)/scale;
+    int ryc = (g_rotate_scale[index].y+mid_y)/scale;
+	r_adjust_x = gxc - rxc;
+	r_adjust_y = gyc - ryc;
+}
+void Image_window::screen_to_rotate_map(int &x, int &y)
+{
+		int sx = last_sx; // grab original screen x,y from last screen_to_game call
+		int sy = last_sy;
+		int dw = get_display_width();
+		int dh = get_display_height();
+		int ix, iy;
+		int gw = game_width;
+		int gh = game_height;
+		int midx = inter_width/2;
+		int midy = inter_height/2;
+		float x_adj = 0.0f;
+		float y_adj = 0.0f; 
+ 		if (inter_height != dh || inter_width != dw ) {			
+			// from screen to inter surface
+			ix = sx * inter_width / dw;
+			iy = sy * inter_height/ dh;
+			if (ix >= inter_width)
+				ix = inter_width-1;
+			if (iy >= inter_height) 
+				iy = inter_height-1;			
+			if (dh != inter_height)
+				// no foolproof way to account for aspect ratio correction 
+				// inter_height= 400 , y_adj = 8;
+				// inter_height= 720 , y_adj = 9;
+				y_adj = (int)((float)((inter_height-400) * 1)/(720-400) + 8);
+		}
+		else {
+			ix = sx;
+			iy = sy;
+		}		
+		// from inter to draw surafce coord ( reverse rotation)
+		int index = game_width*scale * iy + ix;
+		x=(int)((g_rotate_scale[index].x+midx + x_adj)/scale) + get_start_x();
+		y=(int)((g_rotate_scale[index].y+midy + y_adj)/scale) + get_start_y();
 }
 
 /*

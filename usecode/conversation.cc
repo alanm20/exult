@@ -175,13 +175,19 @@ void Conversation::set_face_rect(
 		starty = 1;
 		extrah = 4;
 	}
+	
 	info->face_rect = gwin->clip_to_win(TileRect(startx, starty,
 	                                    face_w + extraw, face_h + extrah));
 	const TileRect &fbox = info->face_rect;
 	// This is where NPC text will go.
+
+	// make sure we are not clip to background window boundary
+	bool s_backbuf= gwin->rotate;
+	gwin->rotate=false;
 	info->text_rect = gwin->clip_to_win(TileRect(
 	                                        fbox.x + fbox.w + 3, fbox.y + 3,
 	                                        screenw - fbox.x - fbox.w - 6, 4 * text_height));
+	gwin->rotate= s_backbuf;											
 	// No room?  (Serpent?)
 	if (info->large_face) {
 		// Show in lower center.

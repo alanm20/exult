@@ -134,16 +134,20 @@ void Scale2x_noblur(
 	// This is the line limit; if going to edge, stop 1 pixel before it.
 	Dest_pixel *limit_x = src1 + srcw - to_right_edge;
 	while (ptr1 < limit_y) {
+		Source_pixel *src_ptr1 = ptr1;
 		if (!edge_off) {    // First pixel.
-			dest0[0] = dest1[0] = src1[0];
-			if (src1[1] == src0[0] && src2[0] != src0[0])
-				dest0[1] = src0[0];
-			else
-				dest0[1] = src1[0];
-			if (src1[1] == src2[0] && src0[0] != src2[0])
-				dest1[1] = src2[0];
-			else
-				dest1[1] = src1[0];
+			if (*src_ptr1 != 255) {
+				dest0[0] = dest1[0] = src1[0];
+				if (src1[1] == src0[0] && src2[0] != src0[0])
+					dest0[1] = src0[0];
+				else
+					dest0[1] = src1[0];
+				if (src1[1] == src2[0] && src0[0] != src2[0])
+					dest1[1] = src2[0];
+				else
+					dest1[1] = src1[0];
+			}
+			++src_ptr1;
 			++src0;
 			++src1;
 			++src2;
@@ -152,26 +156,29 @@ void Scale2x_noblur(
 		}
 		// Middle pixels.
 		while (src1 < limit_x) {
-			if (src1[-1] == src0[0] && src2[0] != src0[0] &&
-			        src1[1] != src0[0])
-				dest0[0] = src0[0];
-			else
-				dest0[0] = src1[0];
-			if (src1[1] == src0[0] && src2[0] != src0[0] &&
-			        src1[-1] != src0[0])
-				dest0[1] = src0[0];
-			else
-				dest0[1] = src1[0];
-			if (src1[-1] == src2[0] && src0[0] != src2[0] &&
-			        src1[1] != src2[0])
-				dest1[0] = src2[0];
-			else
-				dest1[0] = src1[0];
-			if (src1[1] == src2[0] && src0[0] != src2[0] &&
-			        src1[-1] != src2[0])
-				dest1[1] = src2[0];
-			else
-				dest1[1] = src1[0];
+			if (*src_ptr1 != 255) {
+				if (src1[-1] == src0[0] && src2[0] != src0[0] &&
+						src1[1] != src0[0])
+					dest0[0] = src0[0];
+				else
+					dest0[0] = src1[0];
+				if (src1[1] == src0[0] && src2[0] != src0[0] &&
+						src1[-1] != src0[0])
+					dest0[1] = src0[0];
+				else
+					dest0[1] = src1[0];
+				if (src1[-1] == src2[0] && src0[0] != src2[0] &&
+						src1[1] != src2[0])
+					dest1[0] = src2[0];
+				else
+					dest1[0] = src1[0];
+				if (src1[1] == src2[0] && src0[0] != src2[0] &&
+						src1[-1] != src2[0])
+					dest1[1] = src2[0];
+				else
+					dest1[1] = src1[0];
+			}
+			++src_ptr1;
 			++src0;
 			++src1;
 			++src2;
@@ -180,14 +187,17 @@ void Scale2x_noblur(
 		}
 		if (to_right_edge) {
 			// End pixel in row.
-			if (src1[-1] == src0[0] && src2[0] != src0[0])
-				dest0[0] = src0[0];
-			else
-				dest0[0] = src1[0];
-			if (src1[-1] == src2[0] && src0[0] != src2[0])
-				dest1[0] = src2[0];
-			else
-				dest1[0] = src1[0];
+			if (*src_ptr1 != 255) {
+				if (src1[-1] == src0[0] && src2[0] != src0[0])
+					dest0[0] = src0[0];
+				else
+					dest0[0] = src1[0];
+				if (src1[-1] == src2[0] && src0[0] != src2[0])
+					dest1[0] = src2[0];
+				else
+					dest1[0] = src1[0];
+			}
+			++src_ptr1;
 			dest0[1] = src1[0];
 			dest1[1] = src1[0];
 			++src0;
@@ -251,15 +261,17 @@ void Scale2x_noblur(
 		if (src2 > end_src)
 			src2 = src1;    // On last row.
 		if (srcx == 0) {    // First pixel.
-			dest0[0] = dest1[0] = manip.copy(src1[0]);
-			if (src1[1] == src0[0] && src2[0] != src0[0])
-				dest0[1] = manip.copy(src0[0]);
-			else
-				dest0[1] = manip.copy(src1[0]);
-			if (src1[1] == src2[0] && src0[0] != src2[0])
-				dest1[1] = manip.copy(src2[0]);
-			else
-				dest1[1] = manip.copy(src1[0]);
+			if (*src1 != 255) {
+				dest0[0] = dest1[0] = manip.copy(src1[0]);
+				if (src1[1] == src0[0] && src2[0] != src0[0])
+					dest0[1] = manip.copy(src0[0]);
+				else
+					dest0[1] = manip.copy(src1[0]);
+				if (src1[1] == src2[0] && src0[0] != src2[0])
+					dest1[1] = manip.copy(src2[0]);
+				else
+					dest1[1] = manip.copy(src1[0]);
+			}			
 			++src0;
 			++src1;
 			++src2;
@@ -268,26 +280,28 @@ void Scale2x_noblur(
 		}
 		// Middle pixels.
 		while (src1 < limit_x) {
-			if (src1[-1] == src0[0] && src2[0] != src0[0] &&
-			        src1[1] != src0[0])
-				dest0[0] = manip.copy(src0[0]);
-			else
-				dest0[0] = manip.copy(src1[0]);
-			if (src1[1] == src0[0] && src2[0] != src0[0] &&
-			        src1[-1] != src0[0])
-				dest0[1] = manip.copy(src0[0]);
-			else
-				dest0[1] = manip.copy(src1[0]);
-			if (src1[-1] == src2[0] && src0[0] != src2[0] &&
-			        src1[1] != src2[0])
-				dest1[0] = manip.copy(src2[0]);
-			else
-				dest1[0] = manip.copy(src1[0]);
-			if (src1[1] == src2[0] && src0[0] != src2[0] &&
-			        src1[-1] != src2[0])
-				dest1[1] = manip.copy(src2[0]);
-			else
-				dest1[1] = manip.copy(src1[0]);
+			if (*src1 != 255) {
+				if (src1[-1] == src0[0] && src2[0] != src0[0] &&
+						src1[1] != src0[0])
+					dest0[0] = manip.copy(src0[0]);
+				else
+					dest0[0] = manip.copy(src1[0]);
+				if (src1[1] == src0[0] && src2[0] != src0[0] &&
+						src1[-1] != src0[0])
+					dest0[1] = manip.copy(src0[0]);
+				else
+					dest0[1] = manip.copy(src1[0]);
+				if (src1[-1] == src2[0] && src0[0] != src2[0] &&
+						src1[1] != src2[0])
+					dest1[0] = manip.copy(src2[0]);
+				else
+					dest1[0] = manip.copy(src1[0]);
+				if (src1[1] == src2[0] && src0[0] != src2[0] &&
+						src1[-1] != src2[0])
+					dest1[1] = manip.copy(src2[0]);
+				else
+					dest1[1] = manip.copy(src1[0]);
+			}
 			++src0;
 			++src1;
 			++src2;
@@ -296,16 +310,18 @@ void Scale2x_noblur(
 		}
 		if (srcx + srcw == sline_pixels) {
 			// End pixel in row.
-			if (src1[-1] == src0[0] && src2[0] != src0[0])
-				dest0[0] = manip.copy(src0[0]);
-			else
-				dest0[0] = manip.copy(src1[0]);
-			if (src1[-1] == src2[0] && src0[0] != src2[0])
-				dest1[0] = manip.copy(src2[0]);
-			else
-				dest1[0] = manip.copy(src1[0]);
-			dest0[1] = manip.copy(src1[0]);
-			dest1[1] = manip.copy(src1[0]);
+			if (*src1 != 255) {
+				if (src1[-1] == src0[0] && src2[0] != src0[0])
+					dest0[0] = manip.copy(src0[0]);
+				else
+					dest0[0] = manip.copy(src1[0]);
+				if (src1[-1] == src2[0] && src0[0] != src2[0])
+					dest1[0] = manip.copy(src2[0]);
+				else
+					dest1[0] = manip.copy(src1[0]);
+				dest0[1] = manip.copy(src1[0]);
+				dest1[1] = manip.copy(src1[0]);
+			}
 			++src0;
 			++src1;
 			++src2;

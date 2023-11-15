@@ -108,5 +108,6 @@ void ActionSkinColour(int const *params);
 void ActionNotebook(int const *params);
 void ActionSoundTester(int const *params);
 void ActionTest(int const *params);
+void ActionRotate(int const *params);
 
 #endif

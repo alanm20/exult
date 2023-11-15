@@ -874,15 +874,19 @@ USECODE_INTRINSIC(click_on_item) {
 		if (!Get_click(x, y, Mouse::greenselect, nullptr, true))
 			return Usecode_value(0);
 		// Get abs. tile coords. clicked on.
-		t = Tile_coord(gwin->get_scrolltx() + x / c_tilesize,
-		               gwin->get_scrollty() + y / c_tilesize, 0);
+		//t = Tile_coord(gwin->get_scrolltx() + x / c_tilesize,
+		//               gwin->get_scrollty() + y / c_tilesize, 0);
+		int 	nx=x, ny=y;
+		gwin->map_to_rotated_map(nx,ny);  // translate mouse xy if rotate is enabled
+		t = Tile_coord(gwin->get_scrolltx() + nx/c_tilesize,
+				gwin->get_scrollty() + ny/c_tilesize, 0);					   
 		// Look for obj. in open gump.
 		Gump *gump = gumpman->find_gump(x, y);
 		if (gump) {
 			obj = gump->find_object(x, y);
 			if (!obj) obj = gump->find_actor(x, y);
 		} else {        // Search rest of world.
-			obj = gwin->find_object(x, y);
+			obj = gwin->find_object(nx, ny);
 			if (obj)    // Found object?  Use its coords.
 				t = obj->get_tile();
 		}

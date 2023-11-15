@@ -61,11 +61,15 @@ void Scale_point(
 		do {
 			// Src loop X
 			do {
-				Dest_pixel p = manip.copy(*from++);
-				*(to + 0) = p;
-				*(to + 1) = p;
-				*(to2 + 0) = p;
-				*(to2 + 1) = p;
+				if (*from == 255)
+					from++;
+				else {				
+					Dest_pixel p = manip.copy(*from++);
+					*(to + 0) = p;
+					*(to + 1) = p;
+					*(to2 + 0) = p;
+					*(to2 + 1) = p;
+				}
 				to  += 2;
 				to2 += 2;
 			} while (from != limit_x);
@@ -86,18 +90,32 @@ void Scale_point(
 		do {
 			// Src loop X
 			do {
-				Dest_pixel p = manip.copy(*from++);
-				// Inner loops
-				// Dest loop Y
-				do {
-					// Dest loop X
+				if (*from == 255) { // alpha color
+					from++;
+					// Inner loops
+					// Dest loop Y
 					do {
-						*to++ = p;
-					} while (to != px_end);
-					to  += block_xdiff;
-					px_end += dline_pixels;
-				} while (to != py_end);
-
+						// Dest loop X
+						do {
+							*to++;
+						} while (to != px_end);
+						to  += block_xdiff;
+						px_end += dline_pixels;
+					} while (to != py_end);
+				}
+				else {	
+					Dest_pixel p = manip.copy(*from++);
+					// Inner loops
+					// Dest loop Y
+					do {
+						// Dest loop X
+						do {
+							*to++ = p;
+						} while (to != px_end);
+						to  += block_xdiff;
+						px_end += dline_pixels;
+					} while (to != py_end);
+				}
 				to  += factor - block_h;
 				px_end += factor - block_h;
 				py_end += factor;

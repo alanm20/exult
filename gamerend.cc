@@ -349,12 +349,56 @@ void Game_window::paint(
 
 	int light_sources = 0;
 
-	if (main_actor) light_sources = render->paint_map(gx, gy, gw, gh);
+	if (main_actor) {
+			if (rotate) {
+				int bx,by,bw,bh;
+
+				// complete repaint? then cover full bwin dimension
+				if (!gx && !gy && gw == get_width() && gh == get_height())
+				{
+					bx=0;by=0;
+					bw=bwin->get_game_width();
+					bh=bwin->get_game_height();
+				}
+				else {
+					// translate paint region to bwin cooridinate
+						bx = x+(bwin->get_game_width()-win->get_game_width())/2;
+						by = y+(bwin->get_game_height()-win->get_game_height())/2;
+						bw = w;
+						bh = h;
+
+					if (bx < 0) { bw+=bx; bx = 0; }
+					if ((bx+bw) > bwin->get_game_width()) bw = bwin->get_game_width()-bx;
+					if (by < 0) { bh += by; by = 0; }
+					if ((by+bh) > bwin->get_game_height()) bh = bwin->get_game_height()-by;
+				}
+				bwin->set_clip(bx,by,bw,bh);	// Clip to this area.
+
+				enable_bwin(); //hacking. adjust scroll_tx, scroll_ty to reflect the bigger bwin dimension. force get_win() to return bwin* instead of win*
+								// this make paint_map render to bwin with the right tiles
+				// this direct rendering to bwin, tiles and effect will  be painted to bwin
+				Shape_frame::set_to_render(bwin->get_ib8());
+
+				light_sources = render->paint_map( bx, by, bw, bh);
+			}
+			else
+				light_sources = render->paint_map( gx, gy, gw, gh);
+	}
 	else win->fill8(0);
 
 	effects->paint();       // Draw sprites.
+	if (main_actor && rotate) {
+		bwin->show();  // this will invoke the scaler and up scale bwin content to bwin->inter_surface
+						// with clip region still active
+		disable_bwin(); // restore scroll_tx, scroll_ty , get_win() return &win
+		bwin->clear_clip();
+		Shape_frame::set_to_render(win->get_ib8()); //  set rendering target back to win before gump and text are rendered.
+		// use index 255 as transparent color
+		win->fill8(255,w,h,x,y); //give win transparent background
+	}
 
 	win->set_clip(x, y, w, h);  // Clip to this area.
+	
 	// Fill black into unpainted regions
 	if (y < 0) win->fill8(pal->get_border_index(), w, -y, x, y); // Region above window
 	if (x < 0) win->fill8(pal->get_border_index(), -x, get_height(), x, 0); // Region left of window
@@ -476,8 +520,14 @@ void Game_render::paint_chunk_flats(
 	// Paint flat tiles.
 	Image_buffer8 *cflats = olist->get_rendered_flats();
 	if (cflats)
-		gwin->win->copy8(cflats->get_bits(),
+	{
+		if (gwin->rotate) // paint to bwin (background) if rotation is enabled
+			gwin->bwin->copy8(cflats->get_bits(), 
+				c_chunksize, c_chunksize, xoff, yoff);
+		else	
+			gwin->win->copy8(cflats->get_bits(),
 							c_chunksize, c_chunksize, xoff, yoff);
+	}
 }
 
 /*

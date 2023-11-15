@@ -343,6 +343,8 @@ void Barge_object::add_dirty(
 	TileRect box(x - w, y - h, w, h);
 	const int barge_enlarge = (c_tilesize + c_tilesize / 4);
 	const int barge_stretch = (4 * c_tilesize + c_tilesize / 2);
+	box.enlarge(barge_stretch);  // need a bigger rect to erase previous blit
+	/*
 	box.enlarge(barge_enlarge);     // Make it a bit bigger.
 	if (dir % 2) {      // Horizontal?  Stretch.
 		box.x -= barge_enlarge / 2;
@@ -351,6 +353,7 @@ void Barge_object::add_dirty(
 		box.y -= barge_enlarge / 2;
 		box.h += barge_stretch;
 	}
+	*/
 	box = gwin->clip_to_win(box);   // Intersect with screen.
 	gwin->add_dirty(box);
 }

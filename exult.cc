@@ -1107,6 +1107,7 @@ static void Select_for_combo(
 	gwin->get_win()->screen_to_game(event.button.x, event.button.y, false, x, y);
 	//int tx = (gwin->get_scrolltx() + x/c_tilesize)%c_num_tiles;
 	//int ty = (gwin->get_scrollty() + y/c_tilesize)%c_num_tiles;
+	gwin->map_to_rotated_map(x, y);
 	Game_object *obj = gwin->find_object(x, y);
 	if (obj) {
 		if (dragging && obj == last_obj)
@@ -1201,6 +1202,7 @@ static void Handle_events(
 			const int ms = SDL_GetMouseState(&x, &y);
 			//mouse movement needs to be adjusted for HighDPI
 			gwin->get_win()->screen_to_game_hdpi(x, y, gwin->get_fastmouse(), x, y);
+			gwin->map_to_rotated_map(x,y); // if rotate is enabled
 			if ((SDL_BUTTON(3) & ms) && !right_on_gump)
 				gwin->start_actor(x, y,
 				                  Mouse::mouse->avatar_speed);
@@ -1506,6 +1508,7 @@ static void Handle_event(
 			} else if (avatar_can_act && gwin->main_actor_can_act_charmed()) {
 				// Try removing old queue entry.
 				gwin->get_tqueue()->remove(gwin->get_main_actor());
+				gwin->map_to_rotated_map(x,y); // if rotate is enabled
 				gwin->start_actor(x, y, Mouse::mouse->avatar_speed);
 			}
 		}
@@ -1696,6 +1699,7 @@ static void Handle_event(
 		// Dragging with right?
 		else if ((event.motion.state & SDL_BUTTON(3)) && !right_on_gump) {
 			if (avatar_can_act && gwin->main_actor_can_act_charmed())
+				gwin->map_to_rotated_map(mx,my); // if rotate is enabled
 				gwin->start_actor(mx, my, Mouse::mouse->avatar_speed);
 		}
 #ifdef USE_EXULTSTUDIO          // Painting?
@@ -2050,6 +2054,8 @@ void Wait_for_arrival(
 static void Shift_wizards_eye(
     int mx, int my
 ) {
+	// map to backgroup map lcoation
+	gwin->map_to_rotated_map(mx,my);	
 	// Figure dir. from center.
 	const int cx = gwin->get_width() / 2;
 	const int cy = gwin->get_height() / 2;

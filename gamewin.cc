@@ -277,6 +277,31 @@ void Background_noise::handle_event(
 #endif
 }
 
+// sin(45deg)=cos(45deg)=cos(-45deg)
+// sin(-45dg)=-sin(45deg)
+#define SINn45 -0.7071067f
+#define COSn45 0.7071067f
+#define SIN45 0.7071067f
+#define COS45 0.7071067f
+#define SQRT2 1.4142135f
+
+Coord* g_rotate_scale;
+void Game_window::setup_rotate_lut(int gw, int gh,int scale)
+{
+	if (rotate_scale) delete [] rotate_scale;
+	int gwidth=gw*scale;
+	int gheight=gh*scale;
+	rotate_scale = new Coord[gwidth*gheight]; // only support 320 x200 game area with scale 2x for now
+	g_rotate_scale= rotate_scale;
+	int y,x;
+	int index=0;
+	for (y = -gheight/2; y<gheight/2; y++)
+		for (x = -gwidth/2 ; x <gwidth/2 ; x++) {
+			// map normalized game window coord (x:-320,319; y:-100,99) to counter clockwise 45deg backbuffer coord, this allows 45deg rotate fetch of backbuffer pixels
+			rotate_scale[index].x=(int)(x*COSn45 - y*SINn45 + 0.5);    // x*cos(-45) - y*sin(-45)
+			rotate_scale[index++].y=(int)(x*SINn45 + y*COSn45 + 0.5);  // x*sin(-45) + y*sin(-45)
+		}
+}
 /*
  *  Create game window.
  */
@@ -286,7 +311,7 @@ Game_window::Game_window(
 ) :
 	dragging(nullptr), effects(new Effects_manager(this)), map(new Game_map(0)),
 	render(new Game_render), gump_man(new Gump_manager),
-	party_man(new Party_manager), win(nullptr),
+	party_man(new Party_manager), win(nullptr), bwin(0),
 	npc_prox(new Npc_proximity_handler(this)), pal(nullptr),
 	tqueue(new Time_queue()), background_noise(new Background_noise(this)),
 	usecode(nullptr), combat(false), focus(true), ice_dungeon(false),
@@ -298,6 +323,7 @@ Game_window::Game_window(
 	scrolltx(0), scrollty(0), dirty(0, 0, 0, 0),
 	mouse3rd(false), fastmouse(false), double_click_closes_gumps(false),
 	text_bg(false), step_tile_delta(8), allow_right_pathfind(2),
+	rotate(false),drag_map_obj(false),bwin_active(false),rotate_scale(0),
 	scroll_with_mouse(false), alternate_drop(false), allow_autonotes(false), in_exult_menu(false),
 	extended_intro(false),load_palette_timer(0), plasma_start_color(0), plasma_cycle_range(0),
 	skip_lift(255), paint_eggs(false), armageddon(false),
@@ -313,6 +339,19 @@ Game_window::Game_window(
 	// Create window.
 	win = new Image_window8(width, height, gwidth, gheight, scale, fullscreen, scaler, fillmode, fillsclr);
 	win->set_title("Exult Ultima7 Engine");
+	// find background buffer size
+	int win_gw= win->get_game_width();
+	int win_gh= win->get_game_height();
+	int bwin_res = win_gw/SQRT2 + win_gh/SQRT2+32;
+	int trim=bwin_res%16;  if (trim) bwin_res+=(16-trim);
+	// create background window for rotate world, use fix resolution for now (for 320x200 game area)
+	bwin = new Image_window8(width, height, bwin_res, bwin_res, scale, fullscreen, scaler, fillmode, Image_window::NoScaler);
+	setup_rotate_lut(win_gw,win_gh,scale);
+	// rotation adjustement for screen_to_rotate_map 
+	win->calc_rotation_adjustment();
+
+	// give main window access to the backbuffer
+	win->set_bwin(bwin);
 	pal = new Palette();
 	Game_singletons::init(this);    // Everything but 'usecode' exists.
 	Shape_frame::set_to_render(win->get_ib8());
@@ -469,13 +508,87 @@ Game_window::Game_window(
  */
 void Game_window::clear_screen(bool update) {
 	win->fill8(0, win->get_full_width(), win->get_full_height(), win->get_start_x(), win->get_start_y());
-
+	// should clear bwin too
+	if (rotate)
+		bwin->fill8(0,bwin->get_full_width(), bwin->get_full_height(),bwin->get_start_x(), bwin->get_start_y());
 	// update screen
 	if (update)
 		show(true);
 }
 
+// rotate a point 45 degree, for mapping bwin object to screen
+Coord Game_window::rotate_45(int x, int y) const {
+	Coord co;
+	// off center (160,100) a few pixels to improve objct placement
+	int cx = get_game_width()/2+3;
+	int cy = get_game_height()/2+1;
+	int ox=x-cx;
+	int oy=y-cy;
+	co.x = (int)(ox*COS45-oy*SIN45+0.5)+cx;
+	co.y = (int)(ox*SIN45+oy*COS45+0.5)+cy;
+	return co;
+}
+// rotate a point 45 degree, for mapping bwin object to screen
+void Game_window::rotate45(int &x, int& y)
+{
+	// off center (160,100) a few pixels to improve objct placement
+	int cx = get_game_width()/2+3;
+	int cy = get_game_height()/2+1;
+	int ox=x-cx;
+	int oy=y-cy;
+	x = (int)(ox*COS45-oy*SIN45+0.5)+cx;
+	y = (int)(ox*SIN45+oy*COS45+0.5)+cy;
+}
+// rotate a rectangle 45 degree, for mapping bwin object to screen
+TileRect Game_window::rotate45(TileRect &r)
+{
+	if (rotate)
+	{
+		int x1=r.x,y1=r.y;
+		int x2=r.x+r.w,y2=r.y;
+		int x3=r.x+r.w,y3=r.y+r.h;
+		int x4=r.x,y4=r.y+r.h;
+		rotate45(x1,y1);
+		rotate45(x2,y2);
+		rotate45(x3,y3);
+		rotate45(x4,y4);
+		return TileRect(x4,y1,x2-x4,y3-y1);
+	}
+	else
+		return r;
+}
+// rotate screen x y -45deg around screen center, for translating mouse position to background coordinates
+void Game_window::map_to_rotated_map(int &x, int &y)
+{
+	if (rotate) {
+		win->screen_to_rotate_map(x,y);
+		/*
+		// off center (160,100) a few pixels to improve hit detection
+		int gw = get_game_width();
+		int gh = get_game_height();
 
+		int scale = bwin->get_scale_factor();
+		int cx = gw /2;
+		int cy = gh /2;
+		int ox=(x-cx)*scale;
+		int oy=(y-cy)*scale;
+		x = cx + ((int)(ox*COSn45-oy*SINn45)/scale-0.5);//-4;
+		y = cy + (int)(ox*SINn45+oy*COSn45)/scale;//+5;
+		*/
+		/*			
+		// off center (160,100) a few pixels to improve hit detection
+		int gw = get_game_width();
+		int gh = get_game_height();
+
+		int cx = gw /2;
+		int cy = gh /2;
+		int ox=x-cx;
+		int oy=y-cy;
+		x = (int)(ox*COSn45-oy*SINn45+0.5f)+cx;//-4;
+		y = (int)(ox*SINn45+oy*COSn45+0.5f)+cy;//+5;
+		*/
+	}
+}
 
 /*
  *  Deleting game window.
@@ -487,6 +600,7 @@ Game_window::~Game_window(
 	clear_world(false);         // Delete all objects, chunks.
 	for (size_t i = 0; i < array_size(save_names); i++)
 		delete [] save_names[i];
+	delete [] rotate_scale;	
 	delete shape_man;
 	delete gump_man;
 	delete party_man;
@@ -494,6 +608,7 @@ Game_window::~Game_window(
 	delete tqueue;
 	tqueue = nullptr;
 	delete win;
+	delete bwin;
 	delete dragging;
 	delete pal;
 	for (auto *map : maps)
@@ -869,6 +984,12 @@ void Game_window::resized(
     unsigned int newfillsclr
 ) {
 	win->resized(neww, newh, newfs, newgw, newgh, newsc, newsclr, newfill, newfillsclr);
+	int win_gw= win->get_game_width();
+	int win_gh= win->get_game_height();
+	int bwin_res = win_gw/SQRT2 + win_gh/SQRT2+32;
+	int trim=bwin_res%16;  if (trim) bwin_res+=(16-trim);
+	bwin->resized(neww, newh, newfs, bwin_res, bwin_res, newsc, newsclr, newfill, Image_window::NoScaler);
+	setup_rotate_lut(win_gw,win_gh,newsc);
 	pal->apply(false);
 	Shape_frame::set_to_render(win->get_ib8());
 	if (!main_actor)        // In case we're before start.
@@ -1164,9 +1285,27 @@ TileRect Game_window::get_shape_rect(const Game_object *obj) const {
 		t.tx += c_num_tiles;
 	if (t.ty < -c_num_tiles / 2)
 		t.ty += c_num_tiles;
-	return get_shape_rect(s,
+	if (drag_map_obj) // return bounding rect for dragging object in rotated view
+	{
+		// obj not in gump. return rotated rect
+		int x=t.tx*c_tilesize - 1 - lftpix;
+		int y=t.ty*c_tilesize - 1 - lftpix;
+
+		Coord n = rotate_45(x,y);
+		return get_shape_rect(s,n.x,n.y);
+	}
+	else		
+		return get_shape_rect(s,
 	                      t.tx * c_tilesize - 1 - lftpix,
 	                      t.ty * c_tilesize - 1 - lftpix);
+}
+
+TileRect Game_window::get_rotate_shape_rect(Game_object *obj)
+{
+	drag_map_obj=true;
+	TileRect r = get_shape_rect(obj);
+	drag_map_obj=false;
+	return r;
 }
 
 /*
@@ -1533,10 +1672,21 @@ void Game_window::view_right(
 		return;
 	}
 	map->read_map_data();       // Be sure objects are present.
-	// Shift image to left.
-	win->copy(c_tilesize, 0, w - c_tilesize, h, 0, 0);
-	// Paint 1 column to right.
-	paint(w - c_tilesize, 0, c_tilesize, h);
+	if (rotate)	{			
+					// Shift image to left.			
+		int bw=bwin->get_game_width(); int bh=bwin->get_game_height();
+		bwin->copy(c_tilesize, 0, bw - c_tilesize, bh, 0, 0);
+					// Paint 1 column to right.
+			
+		paint( (bw + w )/2 - c_tilesize, -(bh-h)/2, c_tilesize, bh);
+		bwin->show(0,0,bw - c_tilesize, bh);
+	}
+	else {
+		// Shift image to left.
+		win->copy(c_tilesize, 0, w - c_tilesize, h, 0, 0);
+		// Paint 1 column to right.
+		paint(w - c_tilesize, 0, c_tilesize, h);
+	}
 	dirty.x -= c_tilesize;  // Shift dirty rect.
 	dirty = clip_to_win(dirty);
 	// New chunk?
@@ -1556,10 +1706,20 @@ void Game_window::view_left(
 		return;
 	}
 	map->read_map_data();       // Be sure objects are present.
-	win->copy(0, 0, get_width() - c_tilesize, get_height(),
-				c_tilesize, 0);
-	const int h = get_height();
-	paint(0, 0, c_tilesize, h);
+	if (rotate)	{
+		int bw=bwin->get_game_width(); int bh=bwin->get_game_height();
+		bwin->copy(0, 0, bw - c_tilesize, bh, c_tilesize, 0);
+					// Paint 1 column to right.
+		int h = get_height();int w= get_width();
+		paint( -(bw - w )/2 ,-(bh-h)/2, c_tilesize, bh);
+		bwin->show(c_tilesize,0,bw - c_tilesize, bh);
+	}
+	else {	
+		win->copy(0, 0, get_width() - c_tilesize, get_height(),
+					c_tilesize, 0);
+		const int h = get_height();
+		paint(0, 0, c_tilesize, h);
+	}
 	dirty.x += c_tilesize;      // Shift dirty rect.
 	dirty = clip_to_win(dirty);
 	// New chunk?
@@ -1581,8 +1741,18 @@ void Game_window::view_down(
 		return;
 	}
 	map->read_map_data();       // Be sure objects are present.
-	win->copy(0, c_tilesize, w, h - c_tilesize, 0, 0);
-	paint(0, h - c_tilesize, w, c_tilesize);
+	if (rotate) {
+		int bw=bwin->get_game_width(); int bh=bwin->get_game_height();
+		bwin->copy(0, c_tilesize, bw, bh - c_tilesize, 0, 0);
+					// Paint 1 column to right.
+		int h = get_height(); int w= get_width();
+		paint( -(bw-w )/2 ,(bh+h)/2 - c_tilesize, bw, c_tilesize);
+		bwin->show(0,0,bw, bh-c_tilesize);
+	}
+	else {
+		win->copy(0, c_tilesize, w, h - c_tilesize, 0, 0);
+		paint(0, h - c_tilesize, w, c_tilesize);
+	}
 	dirty.y -= c_tilesize;      // Shift dirty rect.
 	dirty = clip_to_win(dirty);
 	// New chunk?
@@ -1603,7 +1773,17 @@ void Game_window::view_up(
 	}
 	map->read_map_data();       // Be sure objects are present.
 	const int w = get_width();
-	win->copy(0, 0, w, get_height() - c_tilesize, 0, c_tilesize);
+	if (rotate) {
+		int bw=bwin->get_game_width(); int bh=bwin->get_game_height();
+		bwin->copy(0, 0, bw, bh - c_tilesize, 0, c_tilesize);
+					// Paint 1 column to right.
+		int h = get_height(); int w= get_width();
+		paint( -(bw-w )/2 ,-(bh-h)/2, bw, c_tilesize);
+		bwin->show(0,c_tilesize,bw, bh-c_tilesize);
+	}
+	else {	
+		win->copy(0, 0, w, get_height() - c_tilesize, 0, c_tilesize);
+	}
 	paint(0, 0, w, c_tilesize);
 	dirty.y += c_tilesize;      // Shift dirty rect.
 	dirty = clip_to_win(dirty);
@@ -1753,7 +1933,7 @@ void Game_window::start_actor(
 		return;
 	if (gump_man->gump_mode() && !gump_man->gumps_dont_pause_game())
 		return;
-//	teleported = 0;
+//	teleported = 0;	
 	if (moving_barge) {
 		// Want to move center there.
 		const int lift = main_actor->get_lift();
@@ -1805,6 +1985,7 @@ void Game_window::start_actor_along_path(
 //	teleported = 0;
 	const int lift = main_actor->get_lift();
 	const int liftpixels = 4 * lift;  // Figure abs. tile.
+	map_to_rotated_map(winx, winy); //map to background window
 	const Tile_coord dest(get_scrolltx() + (winx + liftpixels) / c_tilesize,
 	                get_scrollty() + (winy + liftpixels) / c_tilesize, lift);
 	if (!main_actor->walk_path_to_tile(dest, speed)) {
@@ -2061,6 +2242,7 @@ void Game_window::show_items(
 		obj = gump->find_object(x, y);
 		if (!obj) obj = gump->get_cont_or_actor(x, y);
 	} else {            // Search rest of world.
+        map_to_rotated_map(x,y); //map to background window if rotation is enabled	
 		obj = find_object(x, y);
 	}
 
@@ -2214,6 +2396,7 @@ void Game_window::paused_combat_select(
 	Gump *gump = gump_man->find_gump(x, y);
 	if (gump)
 		return;         // Ignore if clicked on gump.
+    map_to_rotated_map(x, y); // if rotation is enabled, map to background window
 	Game_object *obj = find_object(x, y);
 	Actor *npc = obj ? obj->as_actor() : nullptr;
 	if (!npc || !npc->is_in_party() ||
@@ -2230,6 +2413,7 @@ void Game_window::paused_combat_select(
 	// Pick a spot.
 	if (!Get_click(x, y, Mouse::greenselect, nullptr, true))
 		return;
+	map_to_rotated_map(x , y); // if rotation is enabled	
 	obj = find_object(x, y);    // Find it.
 	if (!obj) {         // Nothing?  Walk there.
 		// Needs work if lift > 0.
@@ -2298,6 +2482,7 @@ void Game_window::double_clicked(
 
 	// If gump manager didn't handle it, we search the world for an object
 	if (!gump) {
+		map_to_rotated_map(x,y); // if rotation is enabled
 		obj = find_object(x, y);
 		if (!avatar_can_act && obj && obj->as_actor()
 		        && obj->as_actor() == main_actor->as_actor()) {
@@ -2949,6 +3134,8 @@ bool Game_window::emulate_is_move_allowed(int tx, int ty) {
 
 //create mini-screenshot (96x60) for use in savegames
 unique_ptr<Shape_file> Game_window::create_mini_screenshot() {
+	bool s_backbuf = rotate; 
+	rotate=false;// disable rotate view	
 	set_all_dirty();
 	render->paint_map(0, 0, get_width(), get_height());
 
@@ -2961,6 +3148,7 @@ unique_ptr<Shape_file> Game_window::create_mini_screenshot() {
 
 	set_all_dirty();
 	paint();
+	rotate=s_backbuf; // restore rotation state
 	return sh;
 }
 
@@ -3073,4 +3261,26 @@ void Game_window::set_shortcutbar(uint8 s) {
 			g_shortcutBar = nullptr;
 		}
 	}
+}
+
+// call this function and Set_renderer(bwin, pal, false) before bliting tiles and
+// effects will (hopefully) put them in background windows(bwin) correctly
+// what this function do:
+// adjust scrolltx , scrollty to account for the bigger  tiles area in bwin
+// mark bwin_active which force gwin->get_win return &bwin insteads of &win
+void Game_window::enable_bwin()
+{
+	bwin_active=true;
+	b_scrolltx=scrolltx;
+	b_scrollty=scrollty;
+	scrolltx= b_scrolltx+(get_game_width()-bwin->get_game_width())/c_tilesize/2;
+	scrollty= b_scrollty+(get_game_height()-bwin->get_game_height())/c_tilesize/2;
+}
+
+// restore normal bliting 
+void Game_window::disable_bwin()
+{
+	scrolltx=b_scrolltx;
+	scrollty=b_scrollty;
+	bwin_active=false;
 }

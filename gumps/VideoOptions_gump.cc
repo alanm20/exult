@@ -370,6 +370,16 @@ void VideoOptions_gump::save_settings() {
 	int tw;
 	int th;
 	Image_window::get_draw_dims(resx, resy, scaling + 1, fill_mode, tgw, tgh, tw, th);
+	if (gwin->rotate == true) {
+		if (tw < 640 || th  < 400) {
+			Yesno_gump::ask("Rotate: Resolution must be higher than 640x400", "TINY_BLACK_FONT");
+			return;
+		}
+		if (!gwin->get_win()->scaler_supports_alpha(scaler)) {
+			Yesno_gump::ask("Rotate Reqs: Point, 2xSaI, Sup2xSaI, SupEagle, Scale2X", "TINY_BLACK_FONT");
+			return;
+		}			
+	}
 	if (tw / (scaling + 1) < 320 || th / (scaling + 1) < 200) {
 		if (!Yesno_gump::ask("Scaled size less than 320x200.\nExult may be unusable.\nApply anyway?", "TINY_BLACK_FONT"))
 			return;

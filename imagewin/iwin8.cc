@@ -105,6 +105,12 @@ void Image_window8::set_palette(
 
 	if (paletted_surface != draw_surface)
 		SDL_SetPaletteColors(draw_surface->format->palette, colors2, 0, 256);
+
+    if (bwin) { //rotate backbuffer enabled, sync up the palette
+        bwin->set_palette(rgbs, maxval, brightness);
+        // force redraw of bwin->inter_surface
+        bwin->set_palette_update(true);
+    }		
 }
 
 /*
@@ -140,6 +146,11 @@ void Image_window8::rotate_colors(
 
 		if (paletted_surface != draw_surface)
 			SDL_SetPaletteColors(draw_surface->format->palette, colors2, 0, 256);
+
+        if (bwin) { //rotate backbuffer enabled, sync up the palette
+			SDL_SetPaletteColors(bwin->get_palette_surface()->format->palette, colors2, 0, 256);
+            bwin->set_palette_update(true);
+        }			
 	}
 }
 

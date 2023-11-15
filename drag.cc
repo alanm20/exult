@@ -96,11 +96,15 @@ Dragging_info::Dragging_info(
 		} else          // the gump isn't draggable
 			return;
 	} else if (x > 0 && y > 0 && x < gwin->get_width() && y < gwin->get_height()) { // Not found in gump?
+		// map scr xy to rotated map
+		gwin->map_to_rotated_map(x,y);
 		to_drag = gwin->find_object(x, y);
 		if (!to_drag)
 			return;
 		// Get coord. where painted.
 		gwin->get_shape_location(to_drag, paintx, painty);
+		// get rotated screen position for dragging obj
+		if (gwin->rotate) gwin->rotate45(paintx,painty);		
 		old_pos = to_drag->get_tile();
 		old_foot = to_drag->get_footprint();
 	}
@@ -154,7 +158,13 @@ bool Dragging_info::start(
 	gwin->get_effects()->remove_text_effects();
 	// Store original pos. on screen.
 	rect = gump ? (obj ? gump->get_shape_rect(obj.get()) : gump->get_dirty())
-		       : gwin->get_shape_rect(obj.get());
+		: (gwin->rotate ? // map map obj to screen with rotation
+				gwin->get_rotate_shape_rect(obj.get()) 
+					: gwin->get_shape_rect(obj.get()));  // if map is not rotated return normal screen rect
+
+	if (!gump && obj) // need this for erase obj  from map
+			rrect = gwin->get_shape_rect(obj.get()); 
+
 	if (gump) {         // Remove from actual position.
 		if (obj) {
 			Container_game_object *owner =
@@ -184,9 +194,23 @@ bool Dragging_info::start(
 	// Make a little bigger.
 	//rect.enlarge(c_tilesize + obj ? 0 : c_tilesize/2);
 	rect.enlarge(deltax > deltay ? deltax : deltay);
+	if (gwin->rotate && !gump && obj) // need this to redraw map behind obj, before map get rotated
+	{		
+		rrect.enlarge(deltax > deltay ? deltax : deltay);
+		rrect.shift(0,-1);
+		TileRect crect = gwin->clip_to_win(rrect);
+		gwin->paint(crect);
 
-	TileRect crect = gwin->clip_to_win(rect);
-	gwin->paint(crect);     // Paint over obj's. area.
+		paintx+=2;   // shift the erase rect a little bit to the upper right to cover old object trail
+		painty-=4;
+		rect.shift(2,-4);
+		
+	}
+	else
+	{
+		TileRect crect = gwin->clip_to_win(rect);
+		gwin->paint(crect);     // Paint over obj's. area.
+	}	
 	return true;
 }
 
@@ -394,12 +418,14 @@ bool Dragging_info::drop_on_map(
     Game_object *to_drop        // == obj if whole thing.
 ) {
 	// Attempting to drop off screen?
-	if (x < 0 || y < 0 || x >= gwin->get_width() || y >= gwin->get_height()) {
-		Mouse::mouse->flash_shape(Mouse::redx);
-		Audio::get_ptr()->play_sound_effect(Audio::game_sfx(76));
-		return false;
+    if (!gwin->rotate) // don't check for off screen if rotate world is enabled
+	{	
+		if (x < 0 || y < 0 || x >= gwin->get_width() || y >= gwin->get_height()) {
+			Mouse::mouse->flash_shape(Mouse::redx);
+			Audio::get_ptr()->play_sound_effect(Audio::game_sfx(76));
+			return false;
+		}
 	}
-
 	int max_lift = cheat.in_hack_mover() ? 255 :
 	               gwin->get_main_actor()->get_lift() + 5;
 	const int skip = gwin->get_render_skip_lift();
@@ -408,7 +434,7 @@ bool Dragging_info::drop_on_map(
 	// Drop where we last painted it.
 	int posx = paintx;
 	int posy = painty;
-	if (posx == -1000) {    // Unless we never painted.
+	if (posx == -1000 || gwin->rotate) {    // Unless we never painted or world is rotated.
 		posx = x;
 		posy = y;
 	}
@@ -499,8 +525,11 @@ bool Dragging_info::drop(
 			to_drop->set_flag(Obj_flags::is_temporary);
 	}
 	// Drop it.
+	//convert scr x y to rotate map x y before calling drop_on_map()
+	int ox =x; int oy =y;
+	gwin->map_to_rotated_map(ox,oy);	
 	if (!(on_gump ? drop_on_gump(x, y, to_drop, on_gump)
-	        : drop_on_map(x, y, to_drop)))
+	        : drop_on_map(ox, oy, to_drop)))
 		return false;
 	// Make a 'dropped' sound.
 	Audio::get_ptr()->play_sound_effect(Audio::game_sfx(74));

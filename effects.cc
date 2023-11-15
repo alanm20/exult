@@ -1009,8 +1009,15 @@ TileRect Text_effect::Figure_text_pos() {
 void Text_effect::add_dirty(
 ) {
 	// Repaint slightly bigger rectangle.
-	const TileRect rect(pos.x - c_tilesize,
-	              pos.y - c_tilesize,
+	int posx=pos.x;
+	int posy=pos.y;
+	// transform text position when world rotation enabled
+	if (sman->gwin->rotate)
+	{
+		sman->gwin->rotate45(posx,posy);
+	}
+	TileRect rect(posx - c_tilesize,
+		       posy - c_tilesize,
 	              width + 2 * c_tilesize, height + 2 * c_tilesize);
 	gwin->add_dirty(gwin->clip_to_win(rect));
 }
@@ -1110,9 +1117,16 @@ void Text_effect::paint(
 ) {
 	const char *ptr = msg.c_str();
 	const int len = strlen(ptr);
+	int posx=pos.x;
+	int posy=pos.y;
+	//transform text position when world rotation is enabled
+	if (sman->gwin->rotate)
+	{
+		sman->gwin->rotate45(posx,posy);
+	}	
 	sman->paint_text(0, ptr, len,
-	                 pos.x,
-	                 pos.y);
+	                 posx,
+	                 posy);
 }
 
 /**
@@ -1203,8 +1217,16 @@ public:
 		// Still on screen?  Restore pix.
 		if (frame >= 0 && x >= 0 && y >= 0 && x < w && y < h) {
 			Game_window *gwin = Game_window::get_instance();
+						
+			int xp=x,yp=y;		
+			if (gwin->rotate) // expect enable_bwin in effect, x y are in bwin coord
+			{					// convert bwin coordinate to gwin->win coordiate. 
+				xp+=(gwin->get_win()->get_game_width()-gwin->get_bwin()->get_game_width())/2;
+				yp+=(gwin->get_win()->get_game_height()-gwin->get_bwin()->get_game_height()/2);
+			}
+				
 			gwin->add_dirty(gwin->clip_to_win(gwin->get_shape_rect(
-			                                      drop.get_shape(), x, y).enlarge(c_tilesize / 2)));
+			                                      drop.get_shape(), xp, yp).enlarge(c_tilesize/2)));
 		}
 		do_move(drop, x, y, w, h, ascrollx, ascrolly);
 	}
@@ -1224,7 +1246,17 @@ public:
 		if (x >= 0 && y >= 0 && x < w && y < h) {
 			Game_window *gwin = Game_window::get_instance();
 			drop.paint_shape(x, y);
-			gwin->add_dirty(gwin->clip_to_win(gwin->get_shape_rect(
+			
+			// expect enable_bwin() in effect ,add_dirty expect game area coordinate
+			// convert bwin coordiante to win coordinate for add_dirty
+			if (gwin->rotate) {
+				int rx = x + (gwin->get_win()->get_game_width()-gwin->get_bwin()->get_game_width())/2;
+				int ry = y + (gwin->get_win()->get_game_height()-gwin->get_bwin()->get_game_height())/2;
+				gwin->add_dirty(gwin->clip_to_win(gwin->get_shape_rect(
+			                                      drop.get_shape(), rx, ry).enlarge(c_tilesize / 2)));
+			}
+			else
+				gwin->add_dirty(gwin->clip_to_win(gwin->get_shape_rect(
 			                                      drop.get_shape(), x, y).enlarge(c_tilesize / 2)));
 		}
 	}
@@ -1257,11 +1289,18 @@ protected:
 	                     int ascrollx, int ascrolly) override {
 		set_frame<fra0, fraN, randomize>(drop);
 		// Time to restart?
+		Game_window *gwin = Game_window::get_instance();
 		if (x < 0 || x >= w || y < 0 || y >= h) {
 			const int r = rand();
-			drop.move(ascrollx + r % (w - w / 8), ascrolly + r % (h - h / 4));
+			if (gwin->rotate) // rotateion, place rain in wider area
+				drop.move(ascrollx + r%(w - w/4), ascrolly + r%(h - h/8)+h/16);
+			else			
+				drop.move(ascrollx + r % (w - w / 8), ascrolly + r % (h - h / 4));
 		} else              // Next spot.
-			drop.move(drop.get_ax() + delta, drop.get_ay() + delta);
+			if (gwin->rotate) // world rotated is enabled. tweek rain direction
+				drop.move(drop.get_ax() + delta, drop.get_ay());
+			else		
+				drop.move(drop.get_ax() + delta, drop.get_ay() + delta);
 	}
 };
 
@@ -1315,7 +1354,10 @@ public:
 
 		if (!gwin->is_main_actor_inside() &&
 		        !gumpman->showing_gumps(true)) {
-			// Don't show rain inside buildings!
+			// Don't show rain inside buildings!			
+			// enable_bwin give bwin scrolltx and scollty and force gwin->get_win() return &bwin
+			if (gwin->rotate)	
+				gwin->enable_bwin();			
 			Image_window8 *win = gwin->get_win();
 			const int w = win->get_game_width();
 			const int h = win->get_game_height();
@@ -1325,6 +1367,8 @@ public:
 			// Move drops.
 			for (int i = 0; i < num_drops; i++)
 				do_drop.move(drops[i], scrolltx, scrollty, w, h);
+			if ( gwin->rotate) 
+				gwin->disable_bwin();
 			gwin->set_painted();
 		}
 		if (curtime >= stop_time) {
@@ -1609,6 +1653,11 @@ inline void Cloud::next(
 		int x;
 		int y;       // Get screen pos.
 		set_start_pos(shape, w, h, x, y);
+		if (gwin->rotate)
+		{
+				x+=(gwin->get_win()->get_game_width()-gwin->get_bwin()->get_game_width())/2;
+				y+=(gwin->get_win()->get_game_height()-gwin->get_bwin()->get_game_height())/2;
+		}
 		wx = x + scrollx;
 		wy = y + scrolly;
 	} else {
@@ -1686,8 +1735,13 @@ void Clouds_effect::handle_event(
 		gwin->set_all_dirty();
 		return;
 	}
-	const int w = gwin->get_width();
-	const int h = gwin->get_height();
+	int w = gwin->get_width();
+	int h = gwin->get_height();
+	if (gwin->rotate) 
+	{ 
+		w = gwin->get_bwin()->get_game_width(); 
+		h = gwin->get_bwin()->get_game_height();
+	}	
 	for (auto& cloud : clouds)
 		cloud->next(gwin, curtime, w, h);
 	gwin->get_tqueue()->add(curtime + delay, this, udata);
@@ -1730,7 +1784,8 @@ void Earthquake::handle_event(
 	}
 
 	Game_window *gwin = Game_window::get_instance();
-	Image_window *win = gwin->get_win();
+	// apply effect to bwin, background buffer
+	Image_window *win = gwin->rotate ? gwin->get_bwin() :gwin->get_win();	
 	int w = win->get_game_width();
 	int h = win->get_game_height();
 	int sx = 0;
@@ -1753,9 +1808,15 @@ void Earthquake::handle_event(
 	}
 	win->copy(sx, sy, w, h, dx, dy);
 	gwin->set_painted();
+	// force the updated bwin update and copy to gwin->win
+	if (gwin->rotate)  
+		win->set_palette_update(true);		
 	gwin->show();
 	// Shake back.
 	win->copy(dx, dy, w, h, sx, sy);
+	// force the updated bwin update and copy to gwin->win
+	if (gwin->rotate) 
+		win->set_palette_update(true);	
 	if (++i < len)          // More to do?  Put back in queue.
 		gwin->get_tqueue()->add(curtime + 100, this, udata);
 	else {

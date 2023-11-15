@@ -175,6 +175,9 @@ void Palette::apply(bool repaint) {
 	pal1[255 * 3 + 1] = g;
 	pal1[255 * 3 + 2] = b;
 
+	// palette has changed find the color index for border color
+	border_index=find_color(border[0],border[1],border[2]);
+
 	if (!repaint)
 		return;
 	win->show();
@@ -413,6 +416,8 @@ int Palette::find_color(int r, int g, int b, int last) const {
 		if (dist < best_distance) { // Better than prev?
 			best_index = i;
 			best_distance = dist;
+			// bail out early if found an exact match
+			if (dist==0) break;
 		}
 	}
 	return best_index;

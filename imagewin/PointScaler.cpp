@@ -58,12 +58,14 @@ public:
 			do {
 				// Src Loop X
 				do {
-					uintX p = Manip::copy(*texel);
+					if (*texel != 255) {
+						uintX p = Manip::copy(*texel);
 
-					WritePix(pixel + 0, p);
-					WritePix(pixel + sizeof(uintX), p);
-					WritePix(pixel2 + 0, p);
-					WritePix(pixel2 + sizeof(uintX), p);
+						WritePix(pixel + 0, p);
+						WritePix(pixel + sizeof(uintX), p);
+						WritePix(pixel2 + 0, p);
+						WritePix(pixel2 + sizeof(uintX), p);
+					}
 					pixel  += sizeof(uintX) * 2;
 					pixel2 += sizeof(uintX) * 2;
 					texel++;
@@ -106,7 +108,8 @@ public:
 					do {
 						// Dest Loop X
 						do {
-							WritePix(pixel, p);
+							if (*texel != 255)
+								WritePix(pixel, p);
 							pixel += sizeof(uintX);
 						} while (pixel != px_end);
 
@@ -157,8 +160,10 @@ public:
 
 					// Dest Loop Y
 					do {
-						WritePix(pixel + 0, p);
-						WritePix(pixel + sizeof(uintX), p);
+						if (*texel != 255) {						
+							WritePix(pixel + 0, p);
+							WritePix(pixel + sizeof(uintX), p);
+						}
 						pixel += pitch;
 						pos_y += sh;
 					} while (pos_y < end_y);
@@ -202,7 +207,8 @@ public:
 
 					// Dest Loop Y
 					do {
-						WritePix(pixel, p);
+						if (*texel != 255)
+							WritePix(pixel, p);
 						pixel += pitch;
 						pos_y += sh;
 					} while (pos_y < end_y);
@@ -255,7 +261,8 @@ public:
 
 						// Dest Loop X
 						while (pos_x < end_x) {
-							WritePix(pixel, p);
+							if (*texel != 255)
+								WritePix(pixel, p);
 							pixel += sizeof(uintX);
 							pos_x += sw;
 						}

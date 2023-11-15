@@ -297,6 +297,10 @@ const struct Action {
 		ActionWriteMiniMap, nullptr, "Write minimap", Action::mapedit_keys, NONE, false, true, true, false
 	},
 	{ "REPAINT", ActionRepaint, nullptr, "Repaint screen", Action::dont_show, NONE, true, true, true, false },
+    { 
+		"TOGGLE_ROTATE_WORLD",
+        ActionRotate, 0, "Toggle rotate world", Action::cheat_keys, NONE, true, true, true, false 
+	},	
 	{ "", nullptr, nullptr, "", Action::dont_show, NONE, false, false, false, false } //terminator
 };
 

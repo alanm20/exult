@@ -883,6 +883,7 @@ void Cheat::cursor_teleport() const {
 	int y;
 	SDL_GetMouseState(&x, &y);
 	gwin->get_win()->screen_to_game_hdpi(x, y, gwin->get_fastmouse(), x, y);
+	if (gwin->rotate) gwin->map_to_rotated_map(x,y);
 	Tile_coord t(gwin->get_scrolltx() + x / c_tilesize,
 	             gwin->get_scrollty() + y / c_tilesize, 0);
 	t.fixme();

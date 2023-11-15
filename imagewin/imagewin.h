@@ -48,6 +48,13 @@ Boston, MA  02111-1307, USA.
 struct SDL_Surface;
 struct SDL_RWops;
 
+
+class Coord
+{
+public:
+	int x,y;
+};
+
 /*
 *   Here's the top-level class to use for image buffers.  Image_window
 *   should be derived from it.
@@ -157,6 +164,8 @@ public:
 
 	static FillMode string_to_fillmode(const char *str);
 	static bool fillmode_to_string(FillMode fmode, std::string &str);
+	SDL_Surface* get_palette_surface() { return paletted_surface; }
+	void set_bwin(Image_window* win) {bwin=win;}
 
 protected:
 	Image_buffer *ibuf;     // Where the data is actually stored.
@@ -168,6 +177,11 @@ protected:
 	int game_height;
 	int inter_width;
 	int inter_height;
+	bool backbuf;			// set to true if this is a background buffer, don't blit to screen
+	bool need_palette_update;
+	Image_window *bwin;		// background window for world rotation
+	int last_sx, last_sy;   // for translate screeen to game position
+	int r_adjust_x, r_adjust_y; // rotation shift correction for screen to game postion translation. 
 
 	static const int guard_band;            // Guardband around the edge of the draw surface to allow scalers to run without clipping
 
@@ -300,7 +314,10 @@ public:
 		  fullscreen(fs), game_width(gamew), game_height(gameh),
 		  fill_mode(fmode), fill_scaler(fillsclr), screen_window(nullptr),
 		  paletted_surface(nullptr), display_surface(nullptr),
-		  inter_surface(nullptr), draw_surface(nullptr) {
+		  inter_surface(nullptr), draw_surface(nullptr), 
+		  backbuf(false), bwin(nullptr), need_palette_update(false) {
+		if (fillsclr == NoScaler) // background buffer has no fillscaler 
+			backbuf=true;
 		static_init();
 		create_surface(w, h);
 	}
@@ -316,6 +333,8 @@ public:
 	int get_display_height();
 
 	void screen_to_game(int sx, int sy, bool fast, int &gx, int &gy) {
+		last_sx = sx; // save this for screen_to_rotate_map
+		last_sy = sy;
 		if (fast) {
 			gx = sx + get_start_x();
 			gy = sy + get_start_y();
@@ -341,6 +360,8 @@ public:
 			gy = lgy;
 		}
 	}
+	void calc_rotation_adjustment();
+	void screen_to_rotate_map(int &x, int &y);
 
 	void game_to_screen(int gx, int gy, bool fast, int &sx, int &sy) {
 		if (fast) {
@@ -540,5 +561,14 @@ public:
 	}
 
 	bool screenshot(SDL_RWops *dst);
+
+	void copy_inter(Image_window* src, int x,
+		int y, int w, int h, Coord* rotate_scale);
+	void set_palette_update(bool value)
+	{
+		need_palette_update = value;
+	}
+	Image_window* get_bwin() {return bwin;}
+	bool scaler_supports_alpha(int scaler);
 };
 #endif  /* INCL_IMAGEWIN    */

@@ -49,6 +49,7 @@ class Dragging_info : public Game_singletons {
 	int mousex, mousey, paintx, painty;
 	Mouse::Mouse_shapes mouse_shape;// Save starting mouse shape.
 	TileRect rect;         // Rectangle to repaint.
+	TileRect rrect;			// Rectangle for repaint pre-rotated background.
 	bool okay;          // True if drag constructed okay.
 	bool possible_theft;        // Moved enough to be 'theft'.
 
