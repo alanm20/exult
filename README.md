@@ -5,6 +5,8 @@ Started out as a prove-of-concept modification of Exuclt 1.4.9 that rotate displ
 - Limited scaler support: Only Point, 2xSAI, Super2xSAI, SuperEagle2X scaler
 - Mouse input are translated back to rotate world with some inaccuary.
 
+https://user-images.githubusercontent.com/19298996/180480152-4f7b18f3-c184-47b7-969f-8787d10ac352.png
+
 # below are original Exult README content
 
 # Badges
