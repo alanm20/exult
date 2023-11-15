@@ -8,7 +8,7 @@ Started out as a prove-of-concept modification of Exult 1.4.9 that rotate displa
 
 Original thread (http://exult.sourceforge.net/forum/read.php?f=1&i=731138&t=373069)
 
-![alt text](https://user-images.githubusercontent.com/19298996/180480152-4f7b18f3-c184-47b7-969f-8787d10ac352.png)
+![alt text](http://farm9.staticflickr.com/8321/8034116159_174998ae7e_z.jpg)
 
 # below are original Exult README content
 
