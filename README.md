@@ -2,7 +2,7 @@
 
 Started out as a prove-of-concept modification of Exult 1.4.9 that rotate display 45 degree to give game a Ultima Online look.
 - Work with SDL3 ( HighDPI is not supported)  
-- Roatation can be toggle using 'Q' key in game
+- Rotation can be toggled using 'Q' key in game
 - Limited scaler support: Only Point, 2xSAI, Super2xSAI, SuperEagle2X scaler
 - Mouse inputs are translated back to rotated world with some inaccuracy.
 
