@@ -1,3 +1,12 @@
+# Exult-rotate
+
+Started out as a prove-of-concept modification of Exuclt 1.4.9 that rotate display 45 degree to give game a Ulitma Online look.
+- Roatation can be toggle using 'Q' key in game
+- Limited scaler support: Only Point, 2xSAI, Super2xSAI, SuperEagle2X scaler
+- Mouse input are translated back to rotate world with some inaccuary.
+
+# below are original Exult README content
+
 # Badges
 
 [![Chat on IRC](https://img.shields.io/badge/web.libera.chat-%23exult-blue?logo=LiveChat&logoColor=white)](https://web.libera.chat/#exult)
