@@ -1,9 +1,12 @@
 # Exult-rotate
 
 Started out as a prove-of-concept modification of Exuclt 1.4.9 that rotate display 45 degree to give game a Ulitma Online look.
+- Work with SDL3 ( HighDPI is not supported)  
 - Roatation can be toggle using 'Q' key in game
 - Limited scaler support: Only Point, 2xSAI, Super2xSAI, SuperEagle2X scaler
 - Mouse input are translated back to rotate world with some inaccuracy.
+
+Original thread (http://exult.sourceforge.net/forum/read.php?f=1&i=731138&t=373069)
 
 ![alt text](https://user-images.githubusercontent.com/19298996/180480152-4f7b18f3-c184-47b7-969f-8787d10ac352.png)
 
