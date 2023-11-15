@@ -4,7 +4,7 @@ Started out as a prove-of-concept modification of Exult 1.4.9 that rotate displa
 - Work with SDL3 ( HighDPI is not supported)  
 - Roatation can be toggle using 'Q' key in game
 - Limited scaler support: Only Point, 2xSAI, Super2xSAI, SuperEagle2X scaler
-- Mouse input are translated back to rotate world with some inaccuracy.
+- Mouse inputs are translated back to rotated world with some inaccuracy.
 
 Original thread (http://exult.sourceforge.net/forum/read.php?f=1&i=731138&t=373069)
 
